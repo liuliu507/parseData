@@ -14,13 +14,15 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 @Component
 public class PcapParser {
 
     private static final Logger log = LoggerFactory.getLogger(PcapParser.class);
+
+    /** 查表法 hex 编码，避免热路径 String.format 正则/装箱开销 */
+    private static final char[] HEX_CHARS = "0123456789ABCDEF".toCharArray();
 
     @Value("${batch.size:500}")
     private int batchSize;
@@ -134,7 +136,10 @@ public class PcapParser {
     private String bytesToHexString(byte[] raw) {
         if (raw == null || raw.length == 0) return "";
         StringBuilder sb = new StringBuilder(raw.length * 2);
-        for (byte b : raw) sb.append(String.format("%02X", b));
+        for (byte b : raw) {
+            int v = b & 0xFF;
+            sb.append(HEX_CHARS[v >>> 4]).append(HEX_CHARS[v & 0x0F]);
+        }
         return sb.toString();
     }
 }

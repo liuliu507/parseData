@@ -32,16 +32,15 @@ public class MetaStore {
     @Value("${retry.max:5}")
     private int retryMax;
 
-    public MetaStore(ClickHouseClient ch) {
+    public MetaStore(ClickHouseClient ch, TableSchema metaTableSchema) {
         this.ch = ch;
-        this.schema = ch.metaSchema();
-        this.insertSettings = new InsertSettings();
+        this.schema = metaTableSchema;
+        // 元数据表每次只写一行，buffer 几 KB 足够
+        this.insertSettings = new InsertSettings()
+                .setInputStreamCopyBufferSize(4096);
     }
 
-    /**
-     * 查询某文件最新状态，无记录返回 null。
-     * 使用 queryAll() 一次性读取结果，返回 GenericRecord 列表。
-     */
+    /** 查询某文件最新状态，无记录返回 null */
     public FileMeta findLatest(String filePath) throws Exception {
         String sql = "SELECT file_size, file_mtime, status, retry_count, packet_count, last_error "
                 + "FROM " + metaTable + " FINAL "
@@ -65,10 +64,7 @@ public class MetaStore {
         return m;
     }
 
-    /**
-     * 把 ClickHouse 返回的时间对象转成 LocalDateTime。
-     * 兼容 LocalDateTime / OffsetDateTime / ZonedDateTime / String。
-     */
+    /** 把 ClickHouse 返回的时间对象兼容转成 LocalDateTime */
     private LocalDateTime toLocalDateTime(Object v) {
         if (v == null) return null;
         if (v instanceof LocalDateTime ldt) return ldt;
@@ -120,11 +116,20 @@ public class MetaStore {
         return retryMax;
     }
 
+    /**
+     * 写入前先 DELETE 同 file_path 旧行。
+     * ReplacingMergeTree 只靠 FINAL 取最新 updated_at，高频更新时 FINAL 扫全表会变慢；
+     * 先 DELETE 旧行让每轮只保留一个版本，FINAL 查询更快、存储更省。
+     */
     private void insert(String filePath, long size, LocalDateTime mtime,
                         String status, long retryCount, long packetCount,
                         String lastError, LocalDateTime updatedAt) throws Exception {
 
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        String delSql = "DELETE FROM " + metaTable
+                + " WHERE file_path = '" + ClickHouseClient.escape(filePath) + "'";
+        ch.execute(delSql);
+
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024);
         RowBinaryFormatWriter writer = new RowBinaryFormatWriter(
                 buffer, schema, ClickHouseFormat.RowBinaryWithDefaults);
 

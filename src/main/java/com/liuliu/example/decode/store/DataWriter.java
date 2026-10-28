@@ -19,21 +19,26 @@ public class DataWriter {
     private final ClickHouseClient ch;
     private final TableSchema schema;
     private final InsertSettings insertSettings;
+    private final int preallocateBytes;
 
     @Value("${ch.table}")
     private String table;
 
-    public DataWriter(ClickHouseClient ch) {
+    public DataWriter(ClickHouseClient ch, TableSchema parseDataSchema,
+                      @Value("${batch.size:500}") int batchSize) {
         this.ch = ch;
-        this.schema = ch.parseDataSchema();
+        this.schema = parseDataSchema;
+
+        // 预分配 buffer：每条 UDP 帧 hex 编码后约 3KB，batchSize 条估算
+        this.preallocateBytes = batchSize * 3072;
         this.insertSettings = new InsertSettings()
-                .setInputStreamCopyBufferSize(7 * 65500);
+                .setInputStreamCopyBufferSize(Math.max(preallocateBytes, 65_500));
     }
 
     public void writeBatch(List<PacketInfo> batch, String sourceFile) throws Exception {
         if (batch.isEmpty()) return;
 
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream(preallocateBytes);
         RowBinaryFormatWriter writer = new RowBinaryFormatWriter(
                 buffer, schema, ClickHouseFormat.RowBinaryWithDefaults);
 

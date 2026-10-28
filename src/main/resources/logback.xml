@@ -4,6 +4,7 @@
     <!-- C3: LOG_DIR 用绝对路径（user.dir 下的 logs/），
          避免 java -jar 换目录启动时日志不知道飘去哪了 -->
     <property name="LOG_DIR" value="${user.dir}/logs"/>
+    <!-- %thread 会展开成 pcap-worker-N / scheduling-1 等，便于判断日志来源 -->
     <property name="PATTERN"
               value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
 

@@ -6,6 +6,8 @@ import com.liuliu.example.decode.scan.FileScanner;
 import com.liuliu.example.decode.store.ClickHouseClient;
 import com.liuliu.example.decode.store.DataWriter;
 import com.liuliu.example.decode.store.MetaStore;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +23,9 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -33,18 +38,24 @@ public class FileProcessService {
     private final ClickHouseClient ch;
     private final DataWriter dataWriter;
     private final MetaStore metaStore;
+    private final ExecutorService executor;
+    private final MeterRegistry meterRegistry;
 
     @Value("${ch.table}")
     private String table;
 
     public FileProcessService(FileScanner scanner, PcapParser parser,
                               ClickHouseClient ch, DataWriter dataWriter,
-                              MetaStore metaStore) {
+                              MetaStore metaStore,
+                              ExecutorService pcapExecutor,
+                              MeterRegistry meterRegistry) {
         this.scanner = scanner;
         this.parser = parser;
         this.ch = ch;
         this.dataWriter = dataWriter;
         this.metaStore = metaStore;
+        this.executor = pcapExecutor;
+        this.meterRegistry = meterRegistry;
     }
 
     private int retryMax() {
@@ -54,16 +65,41 @@ public class FileProcessService {
     @Scheduled(fixedDelayString = "${scan.intervalSeconds:300}000",
             initialDelayString = "5000")
     public void scanAndProcess() {
+        Timer.Sample scanTimer = Timer.start(meterRegistry);
         log.info("===== 开始扫描 =====");
         try {
             Set<String> donePaths = metaStore.listDonePaths();
             List<Path> files = scanner.scan(donePaths);
             log.info("本轮待处理文件数: {}", files.size());
+
+            CountDownLatch latch = new CountDownLatch(files.size());
             for (Path p : files) {
-                processOne(p);
+                executor.submit(() -> {
+                    try {
+                        processOne(p);
+                    } catch (Exception e) {
+                        log.error("文件处理任务异常: {}", p, e);
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
+
+            // 每文件自己 try/catch，latch 不会丢；超时是为了卡死时定时线程也能下一轮
+            try {
+                boolean done = latch.await(10, TimeUnit.MINUTES);
+                if (!done) {
+                    log.warn("等待所有文件处理完成超时（10 分钟），可能还有任务在跑");
+                }
+            } catch (InterruptedException e) {
+                log.warn("scanAndProcess 等待过程被中断", e);
+                Thread.currentThread().interrupt();
             }
         } catch (Exception e) {
             log.error("扫描处理异常", e);
+        } finally {
+            scanTimer.stop(Timer.builder("pcap.scan.duration")
+                    .description("本轮扫描总耗时").register(meterRegistry));
         }
         log.info("===== 扫描结束 =====");
     }
@@ -135,11 +171,14 @@ public class FileProcessService {
 
                 metaStore.markDone(filePath, size, mtime, total);
                 log.info("处理完成: {}，入库 {} 条", filePath, total);
+                meterRegistry.counter("pcap.files.processed", "status", "done").increment();
+                meterRegistry.counter("pcap.packets.total").increment(total);
 
             } catch (Exception e) {
                 long newRetry = retryCount + 1;
                 metaStore.markFailed(filePath, size, mtime, newRetry, e.getMessage());
                 log.error("处理失败: {}（retry={}）", filePath, newRetry, e);
+                meterRegistry.counter("pcap.files.processed", "status", "failed").increment();
             }
 
         } catch (Exception e) {
