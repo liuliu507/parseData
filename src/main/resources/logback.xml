@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- C3: LOG_DIR 用绝对路径（user.dir 下的 logs/），
+         避免 java -jar 换目录启动时日志不知道飘去哪了 -->
+    <property name="LOG_DIR" value="${user.dir}/logs"/>
+    <property name="PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- C2: 显式指定 UTF-8，Windows 控制台默认 GBK 会乱码 -->
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/pcap-parse.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/pcap-parse.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <!-- C3: 单文件上限 10MB，超过就拆，防止磁盘被打爆 -->
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <!-- C2: 显式指定 UTF-8，保证日志文件跨平台可读 -->
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

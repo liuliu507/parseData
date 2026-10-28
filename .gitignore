@@ -1,0 +1,61 @@
+### ========== 构建产物 ==========
+target/
+build/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+dependency-reduced-pom.xml
+
+### ========== IDE 配置 ==========
+### STS / Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### ========== 操作系统 & 编辑器垃圾 ==========
+.DS_Store
+Thumbs.db
+ehthumbs.db
+*.bak
+*.tmp
+*.swp
+*.orig
+HELP.md
+
+### ========== 本地运行产物 ==========
+logs/
+*.log
+run-output*.log
+
+### ========== 本地编译辅助脚本/产物（调试时留下的） ==========
+cp.txt
+PathEncTest.java
+PathEncTest.class
+mvnw.cmd.cmd
+setClasspath.bat
+
+### ========== 本地覆盖配置（含密码、私有路径等，切勿提交） ==========
+application-local.properties
+*.local.properties
+.env
+.env.*
