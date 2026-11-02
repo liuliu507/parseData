@@ -37,7 +37,6 @@ public class PcapParser {
 
         Path src = Paths.get(filePath);
 
-        // pcap4j 在 Windows 下 JNA → wpcap.dll 走 ANSI 字符串，
         // 中文路径会乱码打不开，所以非 ASCII 路径先拷一份 ASCII 临时副本
         Path staging = null;
         boolean isAsciiPath = src.toString().matches("[\\x00-\\x7F]+");
@@ -65,7 +64,6 @@ public class PcapParser {
                 }
 
                 // pcap 时间戳是 UTC epoch，必须按 UTC 转 LocalDateTime，
-                // 否则 Asia/Shanghai 等非 UTC 机器会把时间整体偏移 8 小时
                 info.time = handle.getTimestamp().toInstant()
                         .atZone(ZoneId.of("UTC"))
                         .toLocalDateTime()
@@ -120,7 +118,7 @@ public class PcapParser {
                 info.srcPort = udp.getHeader().getSrcPort().valueAsInt();
                 info.dstPort = udp.getHeader().getDstPort().valueAsInt();
             }
-            // 保持原逻辑：data 存整个以太网帧的十六进制
+            // data 存整个以太网帧的十六进制
             info.data = bytesToHexString(eth.getRawData());
         } catch (Exception e) {
             return null;

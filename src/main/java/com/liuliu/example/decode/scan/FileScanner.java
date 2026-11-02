@@ -27,12 +27,7 @@ public class FileScanner {
     // key = 绝对路径, value = 上一轮扫描时观察到的文件大小
     private final Map<String, Long> lastScanSize = new HashMap<>();
 
-    /**
-     * 扫描目录，返回本轮"稳定"的待处理文件。
-     *
-     * @param forcePassPaths  这些路径会跳过稳定性检查直接返回，
-     *                        典型用途：已 done 且 size/mtime 没变的文件。
-     */
+    // 扫描目录，返回本轮"稳定"的待处理文件。
     public List<Path> scan(Set<String> forcePassPaths) throws IOException {
         List<Path> result = new ArrayList<>();
         Set<String> seenThisRound = new HashSet<>();

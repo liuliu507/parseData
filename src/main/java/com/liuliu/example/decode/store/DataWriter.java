@@ -29,7 +29,7 @@ public class DataWriter {
         this.ch = ch;
         this.schema = parseDataSchema;
 
-        // 预分配 buffer：每条 UDP 帧 hex 编码后约 3KB，batchSize 条估算
+        // 预分配 buffer
         this.preallocateBytes = batchSize * 3072;
         this.insertSettings = new InsertSettings()
                 .setInputStreamCopyBufferSize(Math.max(preallocateBytes, 65_500));

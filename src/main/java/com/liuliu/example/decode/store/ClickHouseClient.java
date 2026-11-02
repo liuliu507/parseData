@@ -94,7 +94,7 @@ public class ClickHouseClient implements AutoCloseable {
         }
     }
 
-    /** parseData 表的预期 schema（只校验必要列） */
+    /** parseData 表的预期 schema */
     public static final Map<String, String> EXPECTED_PARSE_DATA_COLS = Map.of(
             "srcMac", "String",
             "dstMac", "String",

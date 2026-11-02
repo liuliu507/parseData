@@ -10,19 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * 多文件并行处理的线程池。
- *
- * 设计要点：
- *   - corePoolSize = maximumPoolSize = scan.concurrency（固定线程数模型）
- *     I/O 密集型且并发度可预期的场景下，固定线程数比可伸缩线程池更稳定。
- *   - 队列满时用 CallerRunsPolicy：让提交者（定时线程）自己跑，保证任务不丢，
- *     同时反压防止过量提交。
- *   - keepAliveSeconds 对核心线程无效果（keepAlive 只针对非核心线程），
- *     这里保留它仅作未来扩展用。
- *   - 自定义 ThreadFactory 命名为 pcap-worker-N，日志里好查。
- *   - 生命周期 Spring 托管，@PreDestroy 优雅关闭。
- */
+// 多文件并行处理的线程池。
 @Configuration
 public class ThreadPoolConfig {
 
